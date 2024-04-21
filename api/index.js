@@ -86,7 +86,8 @@ app.delete('/remove',(req,res)=>{
             console.log('data.json updated.');
         });
 
-        res.status(204).json([{"R":"S","MESSAGE":"Point deleted."}]);
+        res.send([{"R":"S","MESSAGE":"Point deleted."}]);
+        res.end()
     });
 
 

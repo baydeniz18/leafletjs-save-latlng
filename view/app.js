@@ -9,6 +9,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 let centerIconUrl = 'marker.png';
 
+let cordinate_list = []
+
 let centerIcon = L.icon({
     iconUrl: centerIconUrl,
     iconSize: [40, 40],
@@ -63,6 +65,23 @@ saveButton.addEventListener('click', function () {
 });
 
 async function addMarker(latlng) {
+
+
+    //marker control
+    let control = 0
+
+    if(cordinate_list.filter(function(a){
+        return a.lat == latlng.lat && a.lng == latlng.lng
+    }).length > 0){
+        control = 1
+    }
+
+
+    if(control == 1){
+        console.log('marker couldnt be added')
+        return false
+    }
+    
     let marker = L.marker(latlng).addTo(map);
 
     const myHeaders = new Headers();
@@ -82,11 +101,16 @@ async function addMarker(latlng) {
 
     await fetch("http://localhost:3000/add", requestOptions)
         .then((response) => response.json())
-        .then((result) => console.log(result))
+        .then((result) => {
+            if(result[0].R == 'S'){
+                updateSidebarFromServer()
+            }
+        })
         .catch((error) => console.error(error));
 }
 
 function updateSidebar(data) {
+    cordinate_list = data
     let sidebar = document.getElementById('sidebar');
     sidebar.innerHTML = '';
 
@@ -113,7 +137,7 @@ function updateSidebar(data) {
 
             let deleteButton = card.querySelector('button');
             deleteButton.addEventListener('click', function () {
-                deleteMarker(marker.id);
+                deleteMarker(marker.id,marker.lat,marker.lng);
             });
 
             card.addEventListener('click', (event) => {
@@ -140,15 +164,24 @@ async function updateSidebarFromServer() {
     }
 }
 
-async function deleteMarker(id) {
+async function deleteMarker(id,lat,lng) {
     try {
         const response = await fetch(`http://localhost:3000/remove?id=${id}`, {
             method: 'DELETE'
         });
         if (response.ok) {
             const result = await response.json();
-            console.log(result);
-            updateSidebarFromServer();
+            if(result[0].R == 'S'){
+                map.eachLayer(function(layer) {
+                    if (layer instanceof L.Marker) {
+                        const marker = layer;
+                        if (marker.getLatLng().lat === lat && marker.getLatLng().lng === lng) {
+                            map.removeLayer(marker);
+                        }
+                    }
+                });
+                updateSidebarFromServer()
+            }
         } else {
             console.error('Failed');
         }

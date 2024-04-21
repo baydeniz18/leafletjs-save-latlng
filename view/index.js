@@ -1,190 +1,181 @@
+let map = L.map('map', {
 
-// first needs
+}).setView([51.505, -0.09], 13);
+let saveButton = document.getElementById('saveButton')
+let downloadButton = document.getElementById('downloadButton')
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
 
-    let map = L.map('map',{
-        // dragging:false // It prevents you to drag the map but we need to drag , to prevent move after drag I found another solution
+let centerIconUrl = 'marker.png';
 
-    }).setView([51.505, -0.09], 13);
-    let saveButton = document.getElementById('saveButton')
-    let downloadButton = document.getElementById('downloadButton')
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+let centerIcon = L.icon({
+    iconUrl: centerIconUrl,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+});
 
-    let markers = [];
-    let idCounter = 0;
+let centerMarker = L.marker(map.getCenter(), {
+    icon: centerIcon,
+}).addTo(map);
 
-//---------------------
+map.on('move', function () {
+    centerMarker.setLatLng(map.getCenter());
+});
 
-//onlaod
+let markers = [];
+let idCounter = 0;
 
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
 
-        updateSidebarFromServer();
-    });
+    updateSidebarFromServer();
+});
 
-//---------------------
+map.addEventListener('mousedown', () => {
+    saveButton.setAttribute('disabled', 'true')
+    map.dragging.enable();
 
-// While mouse is moving , I disabled the button
+})
 
-    //also I prevented it from continuing to scroll after I swiped and released it
-
-    // If you want to remove it you can remove map.dragging.disable() and map.dragging.enable() functions
-
-    map.addEventListener('mousedown',()=>{
-        saveButton.setAttribute('disabled','true')
+map.addEventListener('mouseup', () => {
+    saveButton.removeAttribute('disabled')
+    map.dragging.disable();
+    setTimeout(() => {
         map.dragging.enable();
-
-    })
-
-    map.addEventListener('mouseup',()=>{
-        saveButton.removeAttribute('disabled')
-        map.dragging.disable();
-        setTimeout(() => {
-            map.dragging.enable(); 
-        }, 50);
+    }, 50);
 
 
-    })
+})
 
-    map.addEventListener('mouseout',()=>{
-        saveButton.removeAttribute('disabled')
-        map.dragging.disable();
-        setTimeout(() => {
-            map.dragging.enable(); 
-        }, 50);
-    })
+map.addEventListener('mouseout', () => {
+    saveButton.removeAttribute('disabled')
+    map.dragging.disable();
+    setTimeout(() => {
+        map.dragging.enable();
+    }, 50);
+})
 
-//----------------------------------------------
+saveButton.addEventListener('click', function () {
+    saveButton.setAttribute('disabled', 'true')
+    let center = map.getCenter();
+    addMarker(center);
+    saveButton.removeAttribute('disabled')
+});
 
-// here we take the center of the map as lat and lang , and we do add point.
+async function addMarker(latlng) {
+    let marker = L.marker(latlng).addTo(map);
 
-    saveButton.addEventListener('click', function() {
-        saveButton.setAttribute('disabled','true')
-        let center = map.getCenter();
-        addMarker(center);
-        saveButton.removeAttribute('disabled')
-        showNotification('Kordinatlar sisteme kaydedildi','success')
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+        "lat": latlng.lat,
+        "lng": latlng.lng,
+        "date": new Date()
     });
 
-    async function addMarker(latlng) {
-        let marker = L.marker(latlng).addTo(map);
+    const requestOptions = {
+        method: "POST",
+        headers: myHeaders,
+        body: raw
+    };
 
-        const myHeaders = new Headers();
-        myHeaders.append("Content-Type", "application/json");
-        
-        const raw = JSON.stringify({
-          "lat": latlng.lat,
-          "lng": latlng.lng,
-          "date": new Date()
-        });
-        
-        const requestOptions = {
-          method: "POST",
-          headers: myHeaders,
-          body: raw
-        };
-        
-        await fetch("http://localhost:3000/add", requestOptions)
-          .then((response) => response.json())
-          .then((result) => console.log(result))
-          .catch((error) => console.error(error));
-    }
+    await fetch("http://localhost:3000/add", requestOptions)
+        .then((response) => response.json())
+        .then((result) => console.log(result))
+        .catch((error) => console.error(error));
+}
 
-    function updateSidebar(data) {
-        let sidebar = document.getElementById('sidebar');
-        sidebar.innerHTML = '';
+function updateSidebar(data) {
+    let sidebar = document.getElementById('sidebar');
+    sidebar.innerHTML = '';
 
-        if(data.length == 0){
-            sidebar.innerHTML = `
+    if (data.length == 0) {
+        sidebar.innerHTML = `
             <div class="card mb-2">
                 <div class="card-body text-center">
                     <p class="card-text">Veri bulunamadı.</p>
                 </div>
             </div>
         `;
-        } else {
-            data.forEach(marker => {
+    } else {
+        data.forEach(marker => {
 
-                let card = document.createElement('div');
-                card.classList.add('card', 'mb-2');
-        
-                card.innerHTML = `
+            let card = document.createElement('div');
+            card.classList.add('card', 'mb-2');
+
+            card.innerHTML = `
                     <div class="card-body" style="cursor:pointer;">
                         <p class="card-text">Lat: ${marker.lat.toFixed(2)}, Lng: ${marker.lng.toFixed(2)}</p>
-                        <button class="btn btn-danger btn-sm float-end">Sil</button>
+                        <button class="deleteButton btn btn-danger btn-sm float-end">Sil</button>
                     </div>
                 `;
-        
-                let deleteButton = card.querySelector('button');
-                deleteButton.addEventListener('click', function() {
-                    deleteMarker(marker.id);
-                });
-        
-                sidebar.appendChild(card);
+
+            let deleteButton = card.querySelector('button');
+            deleteButton.addEventListener('click', function () {
+                deleteMarker(marker.id);
             });
+
+            card.addEventListener('click', (event) => {
+                if (event.target.classList[0] != 'deleteButton') {
+                    map.setView(L.latLng(marker.lat, marker.lng), 13)
+                    L.marker(marker).addTo(map);
+                }
+
+            })
+
+            sidebar.appendChild(card);
+        });
+    }
+
+}
+
+async function updateSidebarFromServer() {
+    try {
+        const response = await fetch("http://localhost:3000/list");
+        const data = await response.json();
+        updateSidebar(data)
+    } catch (error) {
+        console.error("Hata:", error);
+    }
+}
+
+async function deleteMarker(id) {
+    try {
+        const response = await fetch(`http://localhost:3000/remove?id=${id}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            const result = await response.json();
+            console.log(result);
+            updateSidebarFromServer();
+        } else {
+            console.error('Failed');
         }
-
+    } catch (error) {
+        console.error('Error:', error);
     }
+}
 
-//------------------------------------------------------------------
+function downloadJson() {
+    fetch('data.json')
+        .then(response => response.json())
+        .then(jsonData => {
+            var jsonString = JSON.stringify(jsonData);
 
-//list 
+            var blob = new Blob([jsonString],{type: 'application/json'});
 
-    async function updateSidebarFromServer() {
-        try {
-            const response = await fetch("http://localhost:3000/list");
-            const data = await response.json();
-            updateSidebar(data)
-        } catch (error) {
-            console.error("Hata:", error);
-        }
-    }
+            var url = URL.createObjectURL(blob);
 
-//---------------------
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'coordinates.json';
 
-//delete
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
 
-    async function deleteMarker(id) {
-        try {
-            const response = await fetch(`http://localhost:3000/remove?id=${id}`, { method: 'DELETE' });
-            if (response.ok) {
-                const result = await response.json();
-                console.log(result);
-                updateSidebarFromServer();
-            } else {
-                console.error('Failed');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    }
-
-//---------------------
-
-    function downloadJSON(data) {
-        let json = JSON.stringify(data);
-        let blob = new Blob([json], {type: 'application/json'});
-        let url = URL.createObjectURL(blob);
-        let a = document.createElement('a');
-        a.href = url;
-        a.download = 'data.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    function showNotification(message, type) {
-        toastr.options = {
-            closeButton: true,
-            positionClass: 'toast-top-right',
-            timeOut: 2000
-        };
-
-        if (type === 'success') {
-            toastr.success(message);
-        } else if (type === 'error') {
-            toastr.error(message);
-        }
-    }
+            URL.revokeObjectURL(url); //prevents unnecessary memory usage
+        })
+        .catch(error => console.error('Veri indirme hatası:', error));
+}
